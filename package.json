@@ -1,0 +1,33 @@
+{
+  "name": "nonagaonline",
+  "version": "1.0.0",
+  "description": "Abstract strategy game for 2 players with hexagonal board",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "build": "cd client && npm run build",
+    "install-all": "npm install && cd client && npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luisalonsoupc/Onagaonline.git"
+  },
+  "keywords": ["game", "hexagon", "strategy", "multiplayer", "websocket"],
+  "author": "Luis Alonso",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/luisalonsoupc/Onagaonline/issues"
+  },
+  "homepage": "https://github.com/luisalonsoupc/Onagaonline#readme",
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
