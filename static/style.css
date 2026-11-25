@@ -136,7 +136,8 @@ body {
     margin: 0 auto 20px;
 }
 
-#gameIdInput {
+#gameIdInput,
+#playerNameInput {
     padding: 12px;
     font-size: 16px;
     border: 2px solid #ddd;
@@ -144,7 +145,8 @@ body {
     transition: border-color 0.3s;
 }
 
-#gameIdInput:focus {
+#gameIdInput:focus,
+#playerNameInput:focus {
     outline: none;
     border-color: #667eea;
 }

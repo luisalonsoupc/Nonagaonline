@@ -14,6 +14,7 @@ class GameApp {
         this.stateUpdateQueue = Promise.resolve();
         this.phase = "menu"; // menu, waiting, playing, finished
         this.error = null;
+        this.sessionLost = false;
         this.boardOffset = { x: 300, y: 300 }; // For centering
 
         this.init();
@@ -22,7 +23,8 @@ class GameApp {
     init() {
         socket.on("connect", () => {
             if (this.phase === "menu") {
-                if (this.error === "Connection lost. Reconnecting...") {
+                if (this.error === "Connection lost. Reconnecting..." ||
+                    this.error === "Unable to connect to the server. Retrying...") {
                     this.error = null;
                     this.renderError();
                 }
@@ -34,12 +36,27 @@ class GameApp {
                 this.handleOpenGames({ games: [] });
                 this.error = "Connection lost. Reconnecting...";
                 this.renderError();
+            } else {
+                this.sessionLost = true;
+                this.error = "Connection lost. Both players must refresh and start a new game.";
+                this.render();
+            }
+        });
+        socket.on("connect_error", () => {
+            if (this.phase === "menu") {
+                this.error = "Unable to connect to the server. Retrying...";
+                this.renderError();
             }
         });
         socket.on("OPEN_GAMES", (data) => this.handleOpenGames(data));
         socket.on("GAME_CREATED", (data) => this.handleGameCreated(data));
         socket.on("GAME_JOINED", (data) => this.handleGameJoined(data));
         socket.on("PLAYER_JOINED", (data) => this.handlePlayerJoined(data));
+        socket.on("OPPONENT_DISCONNECTED", () => {
+            this.sessionLost = true;
+            this.error = "Opponent disconnected. Both players must refresh and start a new game.";
+            this.render();
+        });
         socket.on("STATE_UPDATE", (data) => {
             this.stateUpdateQueue = this.stateUpdateQueue.then(() => this.handleStateUpdate(data));
         });
@@ -214,8 +231,10 @@ class GameApp {
         this.error = data.message;
         this.renderError();
         setTimeout(() => {
-            this.error = null;
-            this.renderError();
+            if (!this.sessionLost && this.error === data.message) {
+                this.error = null;
+                this.renderError();
+            }
         }, 3000);
     }
 
@@ -241,16 +260,44 @@ class GameApp {
     }
 
     createGame() {
-        socket.emit("CREATE_GAME", {});
+        const playerName = this.getPlayerName();
+        if (playerName) {
+            socket.emit("CREATE_GAME", { playerName });
+        }
     }
 
     joinGame() {
+        const playerName = this.getPlayerName();
+        if (!playerName) {
+            return;
+        }
         const gameId = document.getElementById("gameIdInput").value.trim();
         if (!gameId) {
             this.handleError({ message: "Please enter a game ID" });
             return;
         }
-        socket.emit("JOIN_GAME", { gameId });
+        socket.emit("JOIN_GAME", { gameId, playerName });
+    }
+
+    getPlayerName() {
+        if (!socket.connected) {
+            this.handleError({ message: "Not connected to the server. Please try again." });
+            return null;
+        }
+        const name = document.getElementById("playerNameInput").value.trim();
+        if (!name || name.length > 40) {
+            this.handleError({ message: "Enter a player name of 1 to 40 characters" });
+            return null;
+        }
+        return name;
+    }
+
+    playerLabel(color) {
+        const name = this.gameState.playerNames[color];
+        const escapedName = name.replace(/[&<>"']/g, character => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[character]);
+        return `${escapedName} (${color.toUpperCase()})`;
     }
 
     handleOpenGames(data) {
@@ -320,7 +367,7 @@ class GameApp {
     }
 
     canPlay() {
-        return this.phase === "playing" && this.gameState.gameState === "active" &&
+        return !this.sessionLost && this.phase === "playing" && this.gameState.gameState === "active" &&
             this.gameState.currentPlayer === this.playerColor && !this.movePending && !this.animating;
     }
 
@@ -398,6 +445,8 @@ class GameApp {
                 <div id="menuError" class="error-message" role="alert" hidden></div>
                 
                 <div class="menu-actions">
+                    <input type="text" id="playerNameInput" placeholder="Enter your name"
+                        aria-label="Your name" maxlength="40" />
                     <button id="createGameButton" onclick="app.createGame()" class="btn btn-primary">
                         Create Game
                     </button>
@@ -433,6 +482,7 @@ class GameApp {
                 <p>Share this ID with another player:</p>
                 <div class="game-id">${this.gameId}</div>
                 <p>Waiting for opponent...</p>
+                ${this.sessionLost ? `<div class="error-message">${this.error}</div>` : ""}
             </div>
         `;
     }
@@ -448,12 +498,13 @@ class GameApp {
         return `
             <div class="game-info">
                 <h2>Nonagaonline</h2>
-                <p>Your color: <span class="color-${this.playerColor}">${this.playerColor.toUpperCase()}</span></p>
-                <p>Current turn: <span class="color-${this.gameState.currentPlayer}">${this.gameState.currentPlayer.toUpperCase()}</span></p>
+                <p>You: <span class="color-${this.playerColor}">${this.playerLabel(this.playerColor)}</span></p>
+                <p>Opponent: <span class="color-${this.playerColor === "red" ? "black" : "red"}">${this.playerLabel(this.playerColor === "red" ? "black" : "red")}</span></p>
+                <p>Current turn: <span class="color-${this.gameState.currentPlayer}">${this.playerLabel(this.gameState.currentPlayer)}</span></p>
                 ${
                     this.gameState.gameState === "won"
                         ? `<div class="winner-message color-${this.gameState.winner}">
-                            🎉 ${this.gameState.winner.toUpperCase()} WINS! 🎉
+                            🎉 ${this.playerLabel(this.gameState.winner)} WINS! 🎉
                         </div>`
                         : ""
                 }
@@ -470,7 +521,7 @@ class GameApp {
 
     boardInactive() {
         return this.gameState.gameState === "active" &&
-            this.gameState.currentPlayer !== this.playerColor;
+            (this.sessionLost || this.gameState.currentPlayer !== this.playerColor);
     }
 
     getBoardViewBox(state) {
@@ -593,11 +644,11 @@ class GameApp {
         }
 
         if (this.gameState.gameState !== "active") {
-            html += "<p>Game over.</p>";
+            html += '<p>Game over.</p><button class="btn btn-primary" onclick="window.location.reload()">New Game</button>';
         } else if (this.movePending) {
             html += "<p>Submitting move...</p>";
         } else if (this.gameState.currentPlayer !== this.playerColor) {
-            html += `<p>⏳ Waiting for ${this.gameState.currentPlayer.toUpperCase()}'s move...</p>`;
+            html += `<p>⏳ Waiting for ${this.playerLabel(this.gameState.currentPlayer)}'s move...</p>`;
         } else if (this.gameState.phase === "disc_selection") {
             html += `<div class="phase-info">Select a blue-ringed disc${this.selectedDisc ? " or a dashed destination" : ""}.</div>`;
         } else {

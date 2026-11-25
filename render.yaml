@@ -1,12 +1,7 @@
 services:
   - type: web
     name: nonagaonline
-    env: node
+    runtime: python
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 3001
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 --threads 100 app:app

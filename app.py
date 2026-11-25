@@ -34,6 +34,23 @@ def generate_game_id():
     return str(uuid.uuid4())[:8].upper()
 
 
+def player_name(data):
+    name = data.get("playerName") if isinstance(data, dict) else None
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 40:
+        emit("ERROR", {"message": "Enter a player name of 1 to 40 characters"})
+        return None
+    return name.strip()
+
+
+def session_state(session):
+    state = session["game"].get_state()
+    state["playerNames"] = {
+        "red": session["player1_name"],
+        "black": session["player2_name"],
+    }
+    return state
+
+
 @app.route("/")
 def index():
     """Serve main page"""
@@ -47,7 +64,7 @@ def get_game_state(game_id):
         return jsonify({"error": "Game not found"}), 404
 
     session = game_sessions[game_id]
-    return jsonify(session["game"].get_state())
+    return jsonify(session_state(session))
 
 
 @socketio.on("connect")
@@ -76,12 +93,20 @@ def on_disconnect():
             if session and session["player1"] == sid and session["player2"] is None:
                 del game_sessions[game_id]
                 broadcast_open_games()
+            elif session:
+                socketio.emit("OPPONENT_DISCONNECTED", room=game_id)
+                other_sid = session["player2"] if session["player1"] == sid else session["player1"]
+                player_to_room.pop(other_sid, None)
+                del game_sessions[game_id]
     print(f"Client disconnected: {sid}")
 
 
 @socketio.on("CREATE_GAME")
 def on_create_game(data):
     """Create a new game"""
+    name = player_name(data)
+    if name is None:
+        return
     with sessions_lock:
         if request.sid in player_to_room:
             emit("ERROR", {"message": "Already in a game"})
@@ -95,8 +120,10 @@ def on_create_game(data):
             "game": game,
             "player1": request.sid,
             "player1_color": "red",
+            "player1_name": name,
             "player2": None,
             "player2_color": "black",
+            "player2_name": None,
             "lock": Lock(),
         }
 
@@ -108,7 +135,7 @@ def on_create_game(data):
             {
                 "gameId": game_id,
                 "playerColor": "red",
-                "state": game.get_state(),
+                "state": session_state(game_sessions[game_id]),
             },
         )
         broadcast_open_games()
@@ -118,6 +145,9 @@ def on_create_game(data):
 @socketio.on("JOIN_GAME")
 def on_join_game(data):
     """Join an existing game"""
+    name = player_name(data)
+    if name is None:
+        return
     game_id = data.get("gameId")
 
     with sessions_lock:
@@ -134,11 +164,12 @@ def on_join_game(data):
             return
 
         session["player2"] = request.sid
+        session["player2_name"] = name
         player_to_room[request.sid] = game_id
         join_room(game_id)
         leave_room("lobby")
 
-        state = session["game"].get_state()
+        state = session_state(session)
         socketio.emit("PLAYER_JOINED", {"state": state}, room=game_id)
         emit(
             "GAME_JOINED",
@@ -233,7 +264,7 @@ def on_end_turn(data):
 
 def broadcast_game_state(session, game_id, action):
     """Broadcast game state to both players"""
-    state = session["game"].get_state()
+    state = session_state(session)
     socketio.emit(
         "STATE_UPDATE",
         {"action": action, "state": state},
