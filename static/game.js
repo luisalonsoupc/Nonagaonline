@@ -445,8 +445,8 @@ class GameApp {
                 <div id="menuError" class="error-message" role="alert" hidden></div>
                 
                 <div class="menu-actions">
-                    <input type="text" id="playerNameInput" placeholder="Enter your name"
-                        aria-label="Your name" maxlength="40" />
+                    <input type="text" id="playerNameInput" placeholder="Your name (create or join)"
+                        aria-label="Your name (create or join)" maxlength="40" />
                     <button id="createGameButton" onclick="app.createGame()" class="btn btn-primary">
                         Create Game
                     </button>
