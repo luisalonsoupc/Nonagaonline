@@ -6,6 +6,7 @@ Handles WebSocket connections and game sessions
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
+from threading import Lock
 from game import Game
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -66,9 +67,10 @@ def on_create_game(data):
     game_sessions[game_id] = {
         "game": game,
         "player1": request.sid,
-        "player1_color": "white",
+        "player1_color": "red",
         "player2": None,
         "player2_color": "black",
+        "lock": Lock(),
     }
 
     player_to_room[request.sid] = game_id
@@ -78,7 +80,7 @@ def on_create_game(data):
         "GAME_CREATED",
         {
             "gameId": game_id,
-            "playerColor": "white",
+            "playerColor": "red",
             "state": game.get_state(),
         },
     )
@@ -143,74 +145,63 @@ def on_move_piece(data):
     piece_id = data.get("pieceId")
     direction = data.get("direction")
 
-    result = game.move_piece(piece_id, direction)
+    with session["lock"]:
+        player_color = (
+            session["player1_color"] if sid == session["player1"]
+            else session["player2_color"] if sid == session["player2"]
+            else None
+        )
+        if session["player2"] is None:
+            emit("ERROR", {"message": "Waiting for opponent"})
+            return
+        if player_color != game.current_player:
+            emit("ERROR", {"message": "Not your turn"})
+            return
 
-    if not result["success"]:
-        emit("ERROR", {"message": result["error"]})
-        return
+        result = game.move_piece(piece_id, direction)
+        if not result["success"]:
+            emit("ERROR", {"message": result["error"]})
+            return
 
-    broadcast_game_state(session, game_id, {"type": "PIECE_MOVED", "pieceId": piece_id})
+        broadcast_game_state(session, game_id, {"type": "PIECE_MOVED", "pieceId": piece_id})
 
 
 @socketio.on("MOVE_DISC")
 def on_move_disc(data):
-    """Handle disc movement"""
+    """Move a disc and finish the current player's turn."""
     sid = request.sid
-    if sid not in player_to_room:
+    game_id = player_to_room.get(sid)
+    if game_id not in game_sessions:
         emit("ERROR", {"message": "Not in a game"})
         return
 
-    game_id = player_to_room[sid]
-    if game_id not in game_sessions:
-        emit("ERROR", {"message": "Game not found"})
-        return
-
     session = game_sessions[game_id]
-    game = session["game"]
-
-    from_q = data.get("fromQ")
-    from_r = data.get("fromR")
-    to_q = data.get("toQ")
-    to_r = data.get("toR")
-
-    result = game.move_disc(from_q, from_r, to_q, to_r)
-
-    if not result["success"]:
-        emit("ERROR", {"message": result["error"]})
-        return
-
-    broadcast_game_state(
-        session,
-        game_id,
-        {"type": "DISC_MOVED", "from": {"q": from_q, "r": from_r}, "to": {"q": to_q, "r": to_r}},
-    )
+    with session["lock"]:
+        game = session["game"]
+        player_color = (
+            session["player1_color"] if sid == session["player1"]
+            else session["player2_color"] if sid == session["player2"]
+            else None
+        )
+        if session["player2"] is None or player_color != game.current_player:
+            emit("ERROR", {"message": "Not your turn"})
+            return
+        result = game.move_disc(data.get("fromQ"), data.get("fromR"), data.get("toQ"), data.get("toR"))
+        if not result["success"]:
+            emit("ERROR", {"message": result["error"]})
+            return
+        broadcast_game_state(session, game_id, {
+            "type": "DISC_MOVED",
+            "from": {"q": data["fromQ"], "r": data["fromR"]},
+            "to": {"q": data["toQ"], "r": data["toR"]},
+            "path": result["path"],
+        })
 
 
 @socketio.on("END_TURN")
 def on_end_turn(data):
-    """End current turn"""
-    sid = request.sid
-    if sid not in player_to_room:
-        emit("ERROR", {"message": "Not in a game"})
-        return
-
-    game_id = player_to_room[sid]
-    if game_id not in game_sessions:
-        emit("ERROR", {"message": "Game not found"})
-        return
-
-    session = game_sessions[game_id]
-    game = session["game"]
-
-    # Determine player color
-    player_color = "white" if sid == session["player1"] else "black"
-
-    if game.current_player != player_color:
-        emit("ERROR", {"message": "Not your turn"})
-        return
-
-    game.end_turn()
-    broadcast_game_state(session, game_id, {"type": "TURN_ENDED", "nextPlayer": game.current_player})
+    """Reject attempts to skip a turn."""
+    emit("ERROR", {"message": "Move a piece and a disc to finish your turn"})
 
 
 def broadcast_game_state(session, game_id, action):

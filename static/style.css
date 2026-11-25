@@ -165,13 +165,13 @@ body {
     font-size: 14px;
 }
 
-.color-white {
-    color: #333;
+.color-red {
+    color: #d32f2f;
     font-weight: bold;
 }
 
 .color-black {
-    color: #333;
+    color: #000;
     font-weight: bold;
 }
 
@@ -196,12 +196,38 @@ body {
 }
 
 .game-board {
+    position: relative;
     display: flex;
     justify-content: center;
     margin: 30px 0;
     background: #fafafa;
     border-radius: 8px;
     padding: 20px;
+    cursor: not-allowed;
+}
+
+.turn-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: rgba(128, 128, 128, 0.45);
+    cursor: not-allowed;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+}
+
+.game-board.inactive .turn-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.game-board.animating::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    cursor: wait;
 }
 
 svg {
@@ -211,21 +237,115 @@ svg {
 }
 
 .disc {
-    cursor: pointer;
-    transition: all 0.2s;
+    cursor: not-allowed;
+    transition: filter 0.2s;
 }
 
 .disc:hover {
     filter: brightness(0.95);
 }
 
-.piece {
-    cursor: pointer;
-    transition: all 0.2s;
+.disc.selectable {
+    stroke: #ff9800 !important;
+    stroke-width: 3 !important;
+    cursor: grab;
 }
 
-.piece:hover {
-    filter: brightness(0.9);
+.disc.selectable:active {
+    cursor: grabbing;
+}
+
+.disc.highlight-destination {
+    fill: #c0c0c0 !important;
+    stroke: #808080 !important;
+    stroke-width: 2 !important;
+}
+
+.disc.highlight-target,
+.disc.highlight-movable {
+    cursor: pointer;
+}
+
+.destination-ring,
+.movable-ring {
+    fill: none;
+    stroke-width: 4;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.destination-ring {
+    stroke: #2e7d32;
+}
+
+.movable-ring {
+    stroke: #1976d2;
+}
+
+.disc.highlight-target .destination-ring {
+    opacity: 1;
+}
+
+.disc.highlight-movable .movable-ring {
+    opacity: 1;
+}
+
+.disc-destination {
+    fill: #f2f2f2;
+    stroke: #bdbdbd;
+    stroke-width: 3;
+    stroke-dasharray: 5,5;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.disc-destination.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.visuals-enter .disc.highlight-target .destination-ring,
+.visuals-enter .disc.highlight-movable .movable-ring,
+.visuals-enter .disc-destination.visible,
+.visuals-enter .winner-ring {
+    opacity: 0;
+}
+
+.winner-ring {
+    fill: none;
+    stroke: #f0b800;
+    stroke-width: 4;
+    filter: drop-shadow(0 0 4px rgba(255, 190, 0, 0.8));
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.piece {
+    cursor: pointer;
+    transition: stroke 0.25s, stroke-width 0.25s, filter 0.25s, opacity 0.25s;
+}
+
+.piece.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.piece.disabled.piece-black {
+    opacity: 1;
+}
+
+.piece.selectable {
+    stroke: #ff6600 !important;
+    stroke-width: 3 !important;
+}
+
+.piece.selected {
+    stroke: #ff6600 !important;
+    stroke-width: 4 !important;
+    filter: drop-shadow(0 0 8px rgba(255, 102, 0, 0.6));
 }
 
 .controls {
@@ -255,6 +375,15 @@ svg {
     padding: 8px 12px;
     font-size: 14px;
     min-width: 50px;
+}
+
+.phase-info {
+    background: #e3f2fd;
+    color: #1565c0;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #1565c0;
+    font-weight: 500;
 }
 
 .error-message {

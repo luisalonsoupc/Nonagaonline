@@ -4,20 +4,29 @@ A web-based multiplayer game for two players with hexagonal board layout.
 
 ## Game Rules
 
-The objective is to connect your 3 pieces in a line (straight, curved, or triangle) by moving pieces and repositioning board discs each turn.
+The objective is to connect your 3 pieces in a line (straight, curved, or triangle).
 
 ### Setup
 - **Board**: 19 discs arranged in hexagon (1 center, 6 inner ring, 12 outer ring)
 - **Pieces**: Each player has 3 colored pieces placed at alternating corners
 
 ### Gameplay
-Players alternate turns, each performing two mandatory actions:
+Players alternate turns:
 
-1. **Move a Piece**: Move one of your pieces in a straight line (one of 6 directions) until it hits another piece or board edge
-2. **Move a Disc**: Pick an outer-ring disc and place it touching at least 2 other discs
+1. Select one of your pieces and click a green-ringed destination. The piece moves
+   in that direction until it reaches another piece or the board edge.
+2. Select a blue-ringed, unoccupied outer disc and click a dashed position to place it.
+   The position must be empty and touch at least two other discs; the disc moved by
+   the opponent on the previous turn cannot be moved. A disc must also have a
+   clear sliding path to its destination without touching another disc.
+
+You may change your selection before choosing a destination. Each move is final;
+after the disc is placed, the turn passes automatically to the other player.
 
 ### Win Condition
-First player to connect all 3 pieces adjacent to each other wins (line, triangle, or curve pattern).
+First player to connect all 3 pieces adjacent to each other wins (line, triangle,
+or curve pattern). The game ends immediately after the winning piece move; no
+disc is moved.
 
 ## Installation
 
@@ -35,7 +44,7 @@ The game will be available at: `http://localhost:5000`
 
 ### Testing with Two Players
 
-1. Open `http://localhost:5000` in one browser/tab (Player 1 - White)
+1. Open `http://localhost:5000` in one browser/tab (Player 1 - Red)
 2. Open `http://localhost:5000` in another browser/tab (Player 2 - Black)
 3. In Player 1: Click "Create Game" and copy the game ID
 4. In Player 2: Click "Join Game" and paste the game ID

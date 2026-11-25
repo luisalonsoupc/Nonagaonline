@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""
+NONAGAONLINE - Quick Start Guide
+=================================
+
+The game is READY TO PLAY! Follow these simple steps.
+"""
+
+# 🎮 STARTING THE GAME
+
+print("""
+╔══════════════════════════════════════════════════════════════════╗
+║                     🎮 NONAGAONLINE 🎮                          ║
+║              Abstract Strategy Game for 2 Players               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+✅ SERVER STATUS: RUNNING on http://localhost:5000
+
+📋 QUICK START:
+
+1️⃣  OPEN TWO BROWSER WINDOWS:
+   - Window 1: http://localhost:5000  (Red pieces)
+   - Window 2: http://localhost:5000  (Black pieces)
+
+2️⃣  GAME SETUP:
+   Window 1 (Player 1 - Red):
+   └─ Click "Create Game"
+   └─ Copy the Game ID
+   └─ Wait for opponent
+   
+   Window 2 (Player 2 - Black):
+   └─ Click "Join Game"
+   └─ Paste the Game ID
+   └─ Click "Join Game"
+
+3️⃣  PLAY THE GAME:
+   
+   Each turn has 3 phases:
+   
+   Phase 1 - SELECT PIECE:
+   ├─ Click one of YOUR colored pieces (Red or Black)
+   ├─ Selected piece shows orange stroke
+   └─ Piece moves in a direction
+   
+   Phase 2 - SELECT DISC:
+   ├─ Yellow discs appear on board
+   ├─ Click one yellow disc to select it
+   └─ System shows valid destinations
+   
+   Phase 3 - PLACE DISC:
+   ├─ Green discs with dashed outline appear
+   ├─ Click a green disc to place the moved disc
+   └─ Your turn ends
+   
+   OPPONENT'S TURN:
+   └─ Wait for them to do the same
+
+4️⃣  WIN THE GAME:
+   └─ Get all 3 of your pieces adjacent to each other
+   └─ Game announces: 🎉 [COLOR] WINS! 🎉
+
+
+🎨 VISUAL GUIDE:
+
+RED pieces          = 🔴 Bright red circles (#d32f2f)
+BLACK pieces        = ⚫ Black circles (#000)
+Normal discs        = ⚪ Grey circles
+Selectable piece    = 🟠 Orange stroke with glow
+Movable discs       = 🟡 Yellow highlighting
+Valid destinations  = 🟢 Green with dashed outline
+
+
+⚠️  IMPORTANT RULES:
+
+✗ Cannot click opponent's pieces
+✗ Cannot click when it's not your turn  
+✗ Cannot move pieces blocked by other pieces
+✗ Discs must touch at least 2 other discs when placed
+✗ Cannot move disc opponent just placed
+
+✓ Pieces move in straight lines (6 hexagonal directions)
+✓ Pieces stop when hitting another piece or board edge
+✓ Each turn: move 1 piece + move 1 disc
+✓ Turns alternate: Red ↔ Black
+
+
+🔧 IF THE GAME DOESN'T START:
+
+1. Check server is running:
+   cd "g:\\Mi unidad\\Ocio\\Castell de Jocs\\Nonagaonline"
+   python app.py
+
+2. Clear browser cache:
+   Press: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
+
+3. Check no errors:
+   Press: F12 (open Developer Tools)
+   Check Console tab for errors
+
+4. Verify dependencies:
+   pip install -r requirements.txt
+
+
+📂 PROJECT FILES:
+
+Core Game Logic:
+├─ game.py           : Game rules & logic
+├─ app.py            : Flask server & WebSocket
+└─ requirements.txt  : Python dependencies
+
+Frontend:
+├─ templates/index.html   : HTML structure
+├─ static/style.css       : Styling & animations
+└─ static/game.js         : Client-side game logic
+
+Documentation:
+├─ README.md              : Project overview
+├─ TESTING_GUIDE.md       : Detailed testing
+├─ FEATURES_IMPLEMENTED.md: What's done
+└─ IMPLEMENTATION_STATUS.md: Full status report
+
+
+📊 SERVER INFO:
+
+✓ Running on:  http://localhost:5000
+✓ Network:     http://192.168.1.123:5000 (adjust IP)
+✓ Language:    Python 3.8+
+✓ Framework:   Flask 3.0.0
+✓ WebSocket:   Socket.IO 5.3.5
+✓ Database:    In-memory (games lost on restart)
+
+
+🎯 GAME RULES SUMMARY:
+
+Setup:
+- 19 hexagonal discs on board
+- 6 pieces: 3 Red, 3 Black (interleaved at corners)
+- Red player goes first
+
+Each Turn:
+1. Move one of YOUR pieces in a hexagonal direction
+   (moves until hitting another piece or board edge)
+2. Move one outer disc to a new position
+   (must touch at least 2 other discs)
+
+Win:
+- First player to connect all 3 pieces adjacent
+- Adjacent = touching each other in any configuration
+- Can form line, triangle, or curve
+
+
+💡 TIPS FOR PLAYING:
+
+1. Plan ahead - think about piece positioning
+2. Control the center - central discs are valuable
+3. Block opponent - place discs strategically
+4. Watch opponent pieces - predict their next move
+5. Don't rush - each piece placement is permanent
+
+
+🐛 COMMON ISSUES:
+
+Can't click pieces?
+└─ It's not your turn. Wait for opponent.
+
+Piece won't move?
+└─ Trying to click wrong color. Only click YOUR pieces.
+
+No yellow discs show?
+└─ That's Phase 2. First complete Phase 1 (select piece).
+
+Can't place disc?
+└─ No valid positions? Discs must touch 2+ other discs.
+
+
+📞 NEED HELP?
+
+1. Check TESTING_GUIDE.md for detailed instructions
+2. Check FEATURES_IMPLEMENTED.md for what's working
+3. Look at game.py for game rules
+4. Check server console for error messages
+5. Use browser DevTools (F12) to debug
+
+
+═══════════════════════════════════════════════════════════════════
+
+🚀 YOU'RE ALL SET! Open your browsers and start playing!
+
+🎉 Enjoy the game!
+
+═══════════════════════════════════════════════════════════════════
+""")
+
+# Server status check
+import subprocess
+import sys
+
+try:
+    response = subprocess.run(
+        ["curl", "-s", "http://localhost:5000"],
+        capture_output=True,
+        timeout=2
+    )
+    if response.returncode == 0:
+        print("\n✅ Server is responding correctly!")
+        print("✅ Ready to play. Open http://localhost:5000 in two browsers.")
+    else:
+        print("\n⚠️  Server may not be responding. Check console for errors.")
+except:
+    print("\n📝 To start server, run: python app.py")
