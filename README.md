@@ -47,7 +47,8 @@ The game will be available at: `http://localhost:5000`
 1. Open `http://localhost:5000` in one browser/tab (Player 1 - Red)
 2. Open `http://localhost:5000` in another browser/tab (Player 2 - Black)
 3. In Player 1: Click "Create Game" and copy the game ID
-4. In Player 2: Click "Join Game" and paste the game ID
+4. In Player 2: Select the waiting game from the list and click "Join Game",
+   or enter the game ID manually
 5. Play!
 
 ## Deployment to Render

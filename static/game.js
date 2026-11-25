@@ -5,6 +5,7 @@ class GameApp {
         this.gameId = null;
         this.playerColor = null;
         this.gameState = null;
+        this.openGames = [];
         this.selectedPiece = null;
         this.selectedDisc = null;
         this.highlightedDiscs = new Map();
@@ -19,6 +20,23 @@ class GameApp {
     }
 
     init() {
+        socket.on("connect", () => {
+            if (this.phase === "menu") {
+                if (this.error === "Connection lost. Reconnecting...") {
+                    this.error = null;
+                    this.renderError();
+                }
+                socket.emit("GET_OPEN_GAMES", {});
+            }
+        });
+        socket.on("disconnect", () => {
+            if (this.phase === "menu") {
+                this.handleOpenGames({ games: [] });
+                this.error = "Connection lost. Reconnecting...";
+                this.renderError();
+            }
+        });
+        socket.on("OPEN_GAMES", (data) => this.handleOpenGames(data));
         socket.on("GAME_CREATED", (data) => this.handleGameCreated(data));
         socket.on("GAME_JOINED", (data) => this.handleGameJoined(data));
         socket.on("PLAYER_JOINED", (data) => this.handlePlayerJoined(data));
@@ -205,6 +223,14 @@ class GameApp {
         if (this.animating) {
             return;
         }
+        if (this.phase === "menu") {
+            const message = document.getElementById("menuError");
+            if (message) {
+                message.textContent = this.error || "";
+                message.hidden = !this.error;
+            }
+            return;
+        }
         const board = document.querySelector(".game-board");
         if (board) {
             board.classList.remove("animating");
@@ -221,11 +247,48 @@ class GameApp {
     joinGame() {
         const gameId = document.getElementById("gameIdInput").value.trim();
         if (!gameId) {
-            this.error = "Please enter a game ID";
-            this.render();
+            this.handleError({ message: "Please enter a game ID" });
             return;
         }
         socket.emit("JOIN_GAME", { gameId });
+    }
+
+    handleOpenGames(data) {
+        const previousGames = this.openGames;
+        this.openGames = data.games;
+        if (this.phase !== "menu") {
+            return;
+        }
+        const input = document.getElementById("gameIdInput");
+        const list = document.getElementById("openGames");
+        if (!input || !list) {
+            return;
+        }
+        if (!input.value || (previousGames.includes(input.value) && !this.openGames.includes(input.value))) {
+            input.value = this.openGames[0] || "";
+        }
+        list.replaceChildren();
+        for (const gameId of this.openGames) {
+            const option = document.createElement("option");
+            option.value = gameId;
+            option.textContent = gameId;
+            list.appendChild(option);
+        }
+        list.size = Math.min(Math.max(this.openGames.length, 2), 5);
+        list.value = input.value;
+        document.getElementById("openGamesSection").hidden = this.openGames.length === 0;
+        document.getElementById("createGameButton").className =
+            `btn ${this.openGames.length ? "btn-secondary" : "btn-primary"}`;
+        document.getElementById("joinGameButton").className =
+            `btn ${this.openGames.length ? "btn-primary" : "btn-secondary"}`;
+    }
+
+    selectOpenGame() {
+        document.getElementById("gameIdInput").value = document.getElementById("openGames").value;
+    }
+
+    syncOpenGameSelection() {
+        document.getElementById("openGames").value = document.getElementById("gameIdInput").value.trim();
     }
 
     selectPiece(pieceId) {
@@ -332,19 +395,26 @@ class GameApp {
             <div class="menu">
                 <h1>Nonagaonline</h1>
                 <p>Abstract strategy game for 2 players</p>
+                <div id="menuError" class="error-message" role="alert" hidden></div>
                 
                 <div class="menu-actions">
-                    <button onclick="app.createGame()" class="btn btn-primary">
+                    <button id="createGameButton" onclick="app.createGame()" class="btn btn-primary">
                         Create Game
                     </button>
                     
                     <div class="join-section">
+                        <div id="openGamesSection" class="open-games" hidden>
+                            <label for="openGames">Games waiting for a player</label>
+                            <select id="openGames" onchange="app.selectOpenGame()" aria-label="Games waiting for a player"></select>
+                        </div>
                         <input
                             type="text"
                             placeholder="Enter game ID"
                             id="gameIdInput"
+                            oninput="app.syncOpenGameSelection()"
                         />
                         <button
+                            id="joinGameButton"
                             onclick="app.joinGame()"
                             class="btn btn-secondary"
                         >
@@ -591,6 +661,10 @@ class GameApp {
 
         content += "</div>";
         app.innerHTML = content;
+        if (this.phase === "menu") {
+            this.handleOpenGames({ games: this.openGames });
+            this.renderError();
+        }
     }
 }
 

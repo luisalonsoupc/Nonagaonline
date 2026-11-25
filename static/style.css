@@ -107,6 +107,35 @@ body {
     gap: 10px;
 }
 
+.open-games {
+    text-align: left;
+}
+
+.open-games label {
+    display: block;
+    color: #555;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.open-games select {
+    width: 100%;
+    padding: 8px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    font-size: 16px;
+}
+
+.open-games option {
+    padding: 8px;
+}
+
+#menuError {
+    max-width: 400px;
+    margin: 0 auto 20px;
+}
+
 #gameIdInput {
     padding: 12px;
     font-size: 16px;

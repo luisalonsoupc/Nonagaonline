@@ -18,6 +18,15 @@ game_sessions = {}
 
 # Player to room mapping
 player_to_room = {}
+sessions_lock = Lock()
+
+
+def open_games():
+    return [game_id for game_id, session in game_sessions.items() if session["player2"] is None]
+
+
+def broadcast_open_games():
+    socketio.emit("OPEN_GAMES", {"games": open_games()}, room="lobby")
 
 
 def generate_game_id():
@@ -44,46 +53,65 @@ def get_game_state(game_id):
 @socketio.on("connect")
 def on_connect():
     """Handle client connection"""
+    join_room("lobby")
     print(f"Client connected: {request.sid}")
+
+
+@socketio.on("GET_OPEN_GAMES")
+def on_get_open_games(data):
+    """Send the current list of games waiting for an opponent."""
+    with sessions_lock:
+        emit("OPEN_GAMES", {"games": open_games()})
 
 
 @socketio.on("disconnect")
 def on_disconnect():
     """Handle client disconnection"""
     sid = request.sid
-    if sid in player_to_room:
-        game_id = player_to_room[sid]
-        leave_room(game_id)
-        del player_to_room[sid]
-        print(f"Client disconnected: {sid}")
+    with sessions_lock:
+        game_id = player_to_room.pop(sid, None)
+        if game_id is not None:
+            session = game_sessions.get(game_id)
+            leave_room(game_id)
+            if session and session["player1"] == sid and session["player2"] is None:
+                del game_sessions[game_id]
+                broadcast_open_games()
+    print(f"Client disconnected: {sid}")
 
 
 @socketio.on("CREATE_GAME")
 def on_create_game(data):
     """Create a new game"""
-    game_id = generate_game_id()
-    game = Game()
+    with sessions_lock:
+        if request.sid in player_to_room:
+            emit("ERROR", {"message": "Already in a game"})
+            return
+        game_id = generate_game_id()
+        while game_id in game_sessions:
+            game_id = generate_game_id()
+        game = Game()
 
-    game_sessions[game_id] = {
-        "game": game,
-        "player1": request.sid,
-        "player1_color": "red",
-        "player2": None,
-        "player2_color": "black",
-        "lock": Lock(),
-    }
+        game_sessions[game_id] = {
+            "game": game,
+            "player1": request.sid,
+            "player1_color": "red",
+            "player2": None,
+            "player2_color": "black",
+            "lock": Lock(),
+        }
 
-    player_to_room[request.sid] = game_id
-    join_room(game_id)
-
-    emit(
-        "GAME_CREATED",
-        {
-            "gameId": game_id,
-            "playerColor": "red",
-            "state": game.get_state(),
-        },
-    )
+        player_to_room[request.sid] = game_id
+        join_room(game_id)
+        leave_room("lobby")
+        emit(
+            "GAME_CREATED",
+            {
+                "gameId": game_id,
+                "playerColor": "red",
+                "state": game.get_state(),
+            },
+        )
+        broadcast_open_games()
     print(f"Game created: {game_id}")
 
 
@@ -92,36 +120,35 @@ def on_join_game(data):
     """Join an existing game"""
     game_id = data.get("gameId")
 
-    if game_id not in game_sessions:
-        emit("ERROR", {"message": "Game not found"})
-        return
+    with sessions_lock:
+        if request.sid in player_to_room:
+            emit("ERROR", {"message": "Already in a game"})
+            return
+        if game_id not in game_sessions:
+            emit("ERROR", {"message": "Game not found"})
+            return
 
-    session = game_sessions[game_id]
-    if session["player2"] is not None:
-        emit("ERROR", {"message": "Game is full"})
-        return
+        session = game_sessions[game_id]
+        if session["player2"] is not None:
+            emit("ERROR", {"message": "Game is full"})
+            return
 
-    session["player2"] = request.sid
-    player_to_room[request.sid] = game_id
-    join_room(game_id)
+        session["player2"] = request.sid
+        player_to_room[request.sid] = game_id
+        join_room(game_id)
+        leave_room("lobby")
 
-    state = session["game"].get_state()
-
-    # Notify both players
-    socketio.emit(
-        "PLAYER_JOINED",
-        {"state": state},
-        room=game_id,
-    )
-
-    emit(
-        "GAME_JOINED",
-        {
-            "gameId": game_id,
-            "playerColor": "black",
-            "state": state,
-        },
-    )
+        state = session["game"].get_state()
+        socketio.emit("PLAYER_JOINED", {"state": state}, room=game_id)
+        emit(
+            "GAME_JOINED",
+            {
+                "gameId": game_id,
+                "playerColor": "black",
+                "state": state,
+            },
+        )
+        broadcast_open_games()
 
     print(f"Player joined game: {game_id}")
 
